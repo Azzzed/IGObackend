@@ -7,7 +7,10 @@ return [
 
     'allowed_origins' => [
         'http://localhost:5173',
+        'http://localhost:5174',
         'http://localhost:3000',
+        'http://192.168.1.12:5173',
+        'http://192.168.1.12:5174',
         'https://igobackend-production.up.railway.app',
         env('FRONTEND_URL', 'http://localhost:5173'),
     ],
