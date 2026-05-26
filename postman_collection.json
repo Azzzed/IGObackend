@@ -1,0 +1,297 @@
+{
+  "info": {
+    "name": "IGO Manager API v1",
+    "description": "Colección completa de la API REST de IGO Manager. Base URL: {{base_url}}/api/v1\n\nVariables de entorno requeridas:\n- base_url: http://127.0.0.1:8000\n- token: (se llena automáticamente al hacer login)\n- empresa_id: ID de empresa activa\n- iniciativa_id: ID de iniciativa activa\n- plan_id: ID de plan de acción",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url",      "value": "http://127.0.0.1:8000",  "type": "string" },
+    { "key": "token",         "value": "",                        "type": "string" },
+    { "key": "empresa_id",    "value": "1",                       "type": "string" },
+    { "key": "iniciativa_id", "value": "1",                       "type": "string" },
+    { "key": "plan_id",       "value": "1",                       "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "🔐 Auth",
+      "item": [
+        {
+          "name": "Registro",
+          "event": [{ "listen": "test", "script": { "exec": ["if (pm.response.code === 201) { pm.environment.set('token', pm.response.json().data.token); }"], "type": "text/javascript" } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"nombre\": \"Juan Pérez\",\n  \"email\": \"juan@empresa.com\",\n  \"password\": \"Password123!\",\n  \"password_confirmation\": \"Password123!\",\n  \"consentimiento\": true\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{base_url}}/api/v1/auth/registro", "host": ["{{base_url}}"], "path": ["api","v1","auth","registro"] }
+          }
+        },
+        {
+          "name": "Login",
+          "event": [{ "listen": "test", "script": { "exec": ["if (pm.response.code === 200) { pm.environment.set('token', pm.response.json().data.token); }"], "type": "text/javascript" } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"carlos@demo.com\",\n  \"password\": \"Demo1234!\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{base_url}}/api/v1/auth/login", "host": ["{{base_url}}"], "path": ["api","v1","auth","login"] }
+          }
+        },
+        {
+          "name": "Login (Admin)",
+          "event": [{ "listen": "test", "script": { "exec": ["if (pm.response.code === 200) { pm.environment.set('token', pm.response.json().data.token); }"], "type": "text/javascript" } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"admin@igomanager.com\",\n  \"password\": \"Admin1234!\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{base_url}}/api/v1/auth/login", "host": ["{{base_url}}"], "path": ["api","v1","auth","login"] }
+          }
+        },
+        {
+          "name": "Me (usuario autenticado)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/api/v1/auth/me", "host": ["{{base_url}}"], "path": ["api","v1","auth","me"] }
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/api/v1/auth/logout", "host": ["{{base_url}}"], "path": ["api","v1","auth","logout"] }
+          }
+        },
+        {
+          "name": "Crear sesión invitado",
+          "event": [{ "listen": "test", "script": { "exec": ["if (pm.response.code === 201) { var d = pm.response.json().data; pm.environment.set('token', d.token); pm.environment.set('token_invitado', d.token_invitado); }"], "type": "text/javascript" } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"consentimiento\": true\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{base_url}}/api/v1/auth/invitado", "host": ["{{base_url}}"], "path": ["api","v1","auth","invitado"] }
+          }
+        },
+        {
+          "name": "Migrar invitado a cuenta",
+          "event": [{ "listen": "test", "script": { "exec": ["if (pm.response.code === 201) { pm.environment.set('token', pm.response.json().data.token); }"], "type": "text/javascript" } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"token_invitado\": \"{{token_invitado}}\",\n  \"nombre\": \"María García\",\n  \"email\": \"maria@empresa.com\",\n  \"password\": \"Password123!\",\n  \"password_confirmation\": \"Password123!\",\n  \"consentimiento\": true\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{base_url}}/api/v1/auth/invitado/migrar", "host": ["{{base_url}}"], "path": ["api","v1","auth","invitado","migrar"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🏢 Empresas",
+      "item": [
+        {
+          "name": "Listar empresas",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/api/v1/empresas", "host": ["{{base_url}}"], "path": ["api","v1","empresas"] }
+          }
+        },
+        {
+          "name": "Crear empresa",
+          "event": [{ "listen": "test", "script": { "exec": ["if (pm.response.code === 201) { pm.environment.set('empresa_id', pm.response.json().data.empresa.id); }"], "type": "text/javascript" } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" }],
+            "body": { "mode": "raw", "raw": "{\n  \"nombre\": \"Mi Empresa SAS\",\n  \"sector\": \"tecnologia\",\n  \"tamano\": \"micro\",\n  \"genero_empresario\": \"hombre\",\n  \"rango_edad\": \"26-35\",\n  \"pais\": \"Colombia\",\n  \"ciudad\": \"Bogota\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{base_url}}/api/v1/empresas", "host": ["{{base_url}}"], "path": ["api","v1","empresas"] }
+          }
+        },
+        {
+          "name": "Ver empresa",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/api/v1/empresas/{{empresa_id}}", "host": ["{{base_url}}"], "path": ["api","v1","empresas","{{empresa_id}}"] }
+          }
+        },
+        {
+          "name": "Actualizar empresa",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" }],
+            "body": { "mode": "raw", "raw": "{\n  \"nombre\": \"Mi Empresa SAS Actualizada\",\n  \"ciudad\": \"Medellin\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{base_url}}/api/v1/empresas/{{empresa_id}}", "host": ["{{base_url}}"], "path": ["api","v1","empresas","{{empresa_id}}"] }
+          }
+        },
+        {
+          "name": "Eliminar empresa (soft delete)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/api/v1/empresas/{{empresa_id}}", "host": ["{{base_url}}"], "path": ["api","v1","empresas","{{empresa_id}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "📊 Iniciativas",
+      "item": [
+        {
+          "name": "Listar iniciativas de empresa",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/api/v1/empresas/{{empresa_id}}/iniciativas", "host": ["{{base_url}}"], "path": ["api","v1","empresas","{{empresa_id}}","iniciativas"] }
+          }
+        },
+        {
+          "name": "Crear iniciativa",
+          "event": [{ "listen": "test", "script": { "exec": ["if (pm.response.code === 201) { pm.environment.set('iniciativa_id', pm.response.json().data.iniciativa.id); }"], "type": "text/javascript" } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" }],
+            "body": { "mode": "raw", "raw": "{\n  \"titulo\": \"Implementar CRM\",\n  \"categoria\": \"comercial_ventas\",\n  \"importancia\": 4,\n  \"gobernabilidad\": 3\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{base_url}}/api/v1/empresas/{{empresa_id}}/iniciativas", "host": ["{{base_url}}"], "path": ["api","v1","empresas","{{empresa_id}}","iniciativas"] }
+          }
+        },
+        {
+          "name": "Ver matriz IGO completa",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/api/v1/empresas/{{empresa_id}}/matriz", "host": ["{{base_url}}"], "path": ["api","v1","empresas","{{empresa_id}}","matriz"] }
+          }
+        },
+        {
+          "name": "Ver iniciativa",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/api/v1/iniciativas/{{iniciativa_id}}", "host": ["{{base_url}}"], "path": ["api","v1","iniciativas","{{iniciativa_id}}"] }
+          }
+        },
+        {
+          "name": "Actualizar iniciativa",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" }],
+            "body": { "mode": "raw", "raw": "{\n  \"importancia\": 5,\n  \"gobernabilidad\": 4\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{base_url}}/api/v1/iniciativas/{{iniciativa_id}}", "host": ["{{base_url}}"], "path": ["api","v1","iniciativas","{{iniciativa_id}}"] }
+          }
+        },
+        {
+          "name": "Eliminar iniciativa (soft delete)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/api/v1/iniciativas/{{iniciativa_id}}", "host": ["{{base_url}}"], "path": ["api","v1","iniciativas","{{iniciativa_id}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "✅ Planes de Acción",
+      "item": [
+        {
+          "name": "Crear plan de acción",
+          "event": [{ "listen": "test", "script": { "exec": ["if (pm.response.code === 201) { pm.environment.set('plan_id', pm.response.json().data.plan.id); }"], "type": "text/javascript" } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" }],
+            "body": { "mode": "raw", "raw": "{\n  \"deadline\": \"2026-08-01\",\n  \"presupuesto\": 5000000,\n  \"aliados\": \"Área de sistemas, proveedor externo\",\n  \"estado\": \"pendiente\",\n  \"notas\": \"Iniciar en próximo trimestre\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{base_url}}/api/v1/iniciativas/{{iniciativa_id}}/plan", "host": ["{{base_url}}"], "path": ["api","v1","iniciativas","{{iniciativa_id}}","plan"] }
+          }
+        },
+        {
+          "name": "Ver plan de acción",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/api/v1/iniciativas/{{iniciativa_id}}/plan", "host": ["{{base_url}}"], "path": ["api","v1","iniciativas","{{iniciativa_id}}","plan"] }
+          }
+        },
+        {
+          "name": "Actualizar plan",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" }],
+            "body": { "mode": "raw", "raw": "{\n  \"estado\": \"en_proceso\",\n  \"notas\": \"Se inició la implementación\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{base_url}}/api/v1/planes/{{plan_id}}", "host": ["{{base_url}}"], "path": ["api","v1","planes","{{plan_id}}"] }
+          }
+        },
+        {
+          "name": "Eliminar plan",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/api/v1/planes/{{plan_id}}", "host": ["{{base_url}}"], "path": ["api","v1","planes","{{plan_id}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🤖 Informe IA",
+      "item": [
+        {
+          "name": "Generar informe (requiere GROQ_API_KEY)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/api/v1/empresas/{{empresa_id}}/informe", "host": ["{{base_url}}"], "path": ["api","v1","empresas","{{empresa_id}}","informe"] }
+          }
+        },
+        {
+          "name": "Ver último informe",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/api/v1/empresas/{{empresa_id}}/informe/ultimo", "host": ["{{base_url}}"], "path": ["api","v1","empresas","{{empresa_id}}","informe","ultimo"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🔑 Admin (token de admin requerido)",
+      "item": [
+        {
+          "name": "Métricas — Usuarios por período",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/api/v1/admin/metricas/usuarios?periodo=mensual", "host": ["{{base_url}}"], "path": ["api","v1","admin","metricas","usuarios"], "query": [{ "key": "periodo", "value": "mensual", "description": "diario | semanal | mensual" }] }
+          }
+        },
+        {
+          "name": "Métricas — Demográficos",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/api/v1/admin/metricas/demograficos", "host": ["{{base_url}}"], "path": ["api","v1","admin","metricas","demograficos"] }
+          }
+        },
+        {
+          "name": "Métricas — Palabras clave (cuadrante 1)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/api/v1/admin/metricas/palabras-clave", "host": ["{{base_url}}"], "path": ["api","v1","admin","metricas","palabras-clave"] }
+          }
+        },
+        {
+          "name": "Métricas — Matriz IGO agregada",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/api/v1/admin/metricas/matriz-agregada", "host": ["{{base_url}}"], "path": ["api","v1","admin","metricas","matriz-agregada"] }
+          }
+        },
+        {
+          "name": "Exportar datos CSV",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/api/v1/admin/exportar", "host": ["{{base_url}}"], "path": ["api","v1","admin","exportar"] }
+          }
+        }
+      ]
+    }
+  ]
+}
