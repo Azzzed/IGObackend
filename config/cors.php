@@ -8,11 +8,7 @@ return [
     'allowed_origins' => [
         'http://localhost:5173',
         'http://localhost:5174',
-        'http://localhost:3000',
-        'http://192.168.1.12:5173',
-        'http://192.168.1.12:5174',
-        'https://n6hfvtjr-5173.use2.devtunnels.ms',
-        'https://igobackend-production.up.railway.app',
+        'https://ig-ofront.vercel.app',
         env('FRONTEND_URL', 'http://localhost:5173'),
     ],
 
