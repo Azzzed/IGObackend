@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\IniciativaController;
 use App\Http\Controllers\Api\V1\InformeController;
 use App\Http\Controllers\Api\V1\PlanAccionController;
 use App\Http\Controllers\Api\V1\Admin\MetricasController;
+use App\Http\Controllers\Api\V1\Admin\RegistrosController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
@@ -69,5 +70,8 @@ Route::prefix('v1')->group(function () {
             Route::get('metricas/iniciativas',     [MetricasController::class, 'iniciativas']);
             // Exportar CSV / Excel (con filtros)
             Route::get('exportar',                 [MetricasController::class, 'exportar']);
+            // Registros históricos unificados
+            Route::get('registros',                [RegistrosController::class, 'index']);
+            Route::get('registros/{id}',           [RegistrosController::class, 'show']);
         });
 });

@@ -40,7 +40,7 @@ class FiltrosAnalyticsRequest extends FormRequest
             // ─── Paginación y orden (para /metricas/iniciativas) ──────────────
             'page'      => ['nullable', 'integer', 'min:1'],
             'per_page'  => ['nullable', 'integer', 'min:1', 'max:100'],
-            'sort'      => ['nullable', 'string', Rule::in(['fecha','importancia','gobernabilidad','cuadrante','sector'])],
+            'sort'      => ['nullable', 'string', Rule::in(['fecha','importancia','gobernabilidad','cuadrante','sector','titulo','estado_plan'])],
             'dir'       => ['nullable', 'string', Rule::in(['asc','desc'])],
         ];
     }

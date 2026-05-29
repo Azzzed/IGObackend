@@ -392,6 +392,171 @@ class MetricasService
         ];
     }
 
+    // ─── Registros históricos unificados ─────────────────────────────────────
+
+    /**
+     * Tabla paginada unificada: iniciativas + empresa + plan (LEFT JOIN).
+     * Incluye título de la iniciativa y estado del plan.
+     * NUNCA incluye email ni user_id.
+     */
+    public function registros(array $filtros = []): array
+    {
+        $page    = max(1, (int) ($filtros['page'] ?? 1));
+        $perPage = min(100, max(1, (int) ($filtros['per_page'] ?? 20)));
+        $dir     = (strtolower($filtros['dir'] ?? 'desc') === 'asc') ? 'asc' : 'desc';
+
+        $sortMap = [
+            'fecha'        => 'iniciativas.created_at',
+            'importancia'  => 'iniciativas.importancia',
+            'gobernabilidad' => 'iniciativas.gobernabilidad',
+            'cuadrante'    => 'iniciativas.cuadrante',
+            'sector'       => 'empresas.sector',
+            'titulo'       => 'iniciativas.titulo',
+            'estado_plan'  => 'planes_accion.estado',
+        ];
+        $sortCol = $sortMap[$filtros['sort'] ?? 'fecha'] ?? 'iniciativas.created_at';
+
+        $query = Iniciativa::whereNull('iniciativas.deleted_at')
+            ->join('empresas', 'iniciativas.empresa_id', '=', 'empresas.id')
+            ->whereNull('empresas.deleted_at')
+            ->leftJoin('planes_accion', function ($join) {
+                $join->on('planes_accion.iniciativa_id', '=', 'iniciativas.id')
+                     ->whereNull('planes_accion.deleted_at');
+            })
+            ->select([
+                'iniciativas.id',
+                DB::raw("TO_CHAR(iniciativas.created_at, 'YYYY-MM-DD') as fecha_creacion"),
+                'empresas.nombre as empresa_nombre',
+                'empresas.sector',
+                'empresas.tamano',
+                'empresas.ciudad',
+                'empresas.pais',
+                'empresas.genero_empresario',
+                'empresas.rango_edad',
+                'iniciativas.titulo',
+                'iniciativas.categoria',
+                'iniciativas.importancia',
+                'iniciativas.gobernabilidad',
+                'iniciativas.cuadrante',
+                DB::raw('CASE WHEN planes_accion.id IS NOT NULL THEN true ELSE false END as tiene_plan'),
+                'planes_accion.estado as estado_plan',
+            ]);
+
+        $this->aplicarFiltros($query, $filtros, true, true, 'iniciativas');
+
+        $total = (clone $query)->count();
+        $rows  = $query
+            ->orderBy($sortCol, $dir)
+            ->offset(($page - 1) * $perPage)
+            ->limit($perPage)
+            ->get()
+            ->map(fn ($row) => [
+                'id'               => $row->id,
+                'fecha_creacion'   => $row->fecha_creacion,
+                'empresa_nombre'   => $row->empresa_nombre,
+                'sector'           => $row->sector,
+                'tamano'           => $row->tamano,
+                'ciudad'           => $row->ciudad,
+                'pais'             => $row->pais,
+                'genero_empresario'=> $row->genero_empresario,
+                'rango_edad'       => $row->rango_edad,
+                'titulo'           => $row->titulo,
+                'categoria'        => $row->categoria,
+                'importancia'      => $row->importancia,
+                'gobernabilidad'   => $row->gobernabilidad,
+                'cuadrante'        => $row->cuadrante,
+                'tiene_plan'       => (bool) $row->tiene_plan,
+                'estado_plan'      => $row->estado_plan,
+            ])
+            ->toArray();
+
+        return [
+            'rows' => $rows,
+            'meta' => [
+                'total'     => $total,
+                'page'      => $page,
+                'per_page'  => $perPage,
+                'last_page' => (int) ceil($total / max($perPage, 1)),
+            ],
+        ];
+    }
+
+    /**
+     * Detalle completo de una iniciativa: empresa + plan si existe.
+     * Anónimo — sin email ni user_id.
+     *
+     * @throws \Illuminate\Database\Eloquent\ModelNotFoundException
+     */
+    public function registroDetalle(int $iniciativaId): array
+    {
+        $ini = Iniciativa::whereNull('iniciativas.deleted_at')
+            ->join('empresas', 'iniciativas.empresa_id', '=', 'empresas.id')
+            ->whereNull('empresas.deleted_at')
+            ->leftJoin('planes_accion', function ($join) {
+                $join->on('planes_accion.iniciativa_id', '=', 'iniciativas.id')
+                     ->whereNull('planes_accion.deleted_at');
+            })
+            ->select([
+                'iniciativas.id',
+                DB::raw("TO_CHAR(iniciativas.created_at, 'YYYY-MM-DD') as fecha_creacion"),
+                DB::raw("TO_CHAR(iniciativas.updated_at, 'YYYY-MM-DD') as fecha_actualizacion"),
+                // Empresa (anónima — sin user_id ni email)
+                'empresas.id as empresa_id',
+                'empresas.nombre as empresa_nombre',
+                'empresas.sector',
+                'empresas.tamano',
+                'empresas.ciudad',
+                'empresas.pais',
+                'empresas.genero_empresario',
+                'empresas.rango_edad',
+                // Iniciativa
+                'iniciativas.titulo',
+                'iniciativas.categoria',
+                'iniciativas.importancia',
+                'iniciativas.gobernabilidad',
+                'iniciativas.cuadrante',
+                // Plan de acción
+                DB::raw('CASE WHEN planes_accion.id IS NOT NULL THEN true ELSE false END as tiene_plan'),
+                'planes_accion.estado as estado_plan',
+                'planes_accion.presupuesto as plan_presupuesto',
+                'planes_accion.aliados as plan_aliados',
+                'planes_accion.notas as plan_notas',
+                DB::raw("TO_CHAR(planes_accion.deadline, 'YYYY-MM-DD') as plan_deadline"),
+            ])
+            ->where('iniciativas.id', $iniciativaId)
+            ->firstOrFail();
+
+        return [
+            'iniciativa' => [
+                'id'                  => $ini->id,
+                'titulo'              => $ini->titulo,
+                'categoria'           => $ini->categoria,
+                'importancia'         => $ini->importancia,
+                'gobernabilidad'      => $ini->gobernabilidad,
+                'cuadrante'           => $ini->cuadrante,
+                'fecha_creacion'      => $ini->fecha_creacion,
+                'fecha_actualizacion' => $ini->fecha_actualizacion,
+            ],
+            'empresa' => [
+                'id'                => $ini->empresa_id,
+                'nombre'            => $ini->empresa_nombre,
+                'sector'            => $ini->sector,
+                'tamano'            => $ini->tamano,
+                'ciudad'            => $ini->ciudad,
+                'pais'              => $ini->pais,
+                'genero_empresario' => $ini->genero_empresario,
+                'rango_edad'        => $ini->rango_edad,
+            ],
+            'plan' => (bool) $ini->tiene_plan ? [
+                'estado'      => $ini->estado_plan,
+                'presupuesto' => $ini->plan_presupuesto,
+                'aliados'     => $ini->plan_aliados,
+                'notas'       => $ini->plan_notas,
+                'deadline'    => $ini->plan_deadline,
+            ] : null,
+        ];
+    }
+
     // ─── Exportar CSV (con filtros) ───────────────────────────────────────────
 
     public function exportarCsv(array $filtros = []): array
