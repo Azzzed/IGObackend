@@ -8,6 +8,7 @@ use App\Http\Requests\Iniciativa\UpdateIniciativaRequest;
 use App\Http\Resources\IniciativaResource;
 use App\Models\Iniciativa;
 use App\Services\IgoService;
+use App\Services\MetricasService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -39,6 +40,7 @@ class IniciativaController extends Controller
 
         // Recalcular cuadrantes de toda la empresa porque cambiaron las asíntotas
         $this->igoService->recalcularTodosLosCuadrantes($empresa->id);
+        MetricasService::invalidarCacheAdmin();
 
         return response()->json([
             'success' => true,
@@ -64,6 +66,7 @@ class IniciativaController extends Controller
         $iniciativa->update($request->validated());
 
         $this->igoService->recalcularTodosLosCuadrantes($iniciativa->empresa_id);
+        MetricasService::invalidarCacheAdmin();
 
         return response()->json([
             'success' => true,
@@ -80,6 +83,7 @@ class IniciativaController extends Controller
         $iniciativa->delete();
 
         $this->igoService->recalcularTodosLosCuadrantes($empresaId);
+        MetricasService::invalidarCacheAdmin();
 
         return response()->json([
             'success' => true,

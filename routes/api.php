@@ -55,10 +55,19 @@ Route::prefix('v1')->group(function () {
     Route::middleware(['auth:sanctum', \App\Http\Middleware\AdminMiddleware::class])
         ->prefix('admin')
         ->group(function () {
+            // KPIs — nuevo
+            Route::get('metricas/kpis',            [MetricasController::class, 'kpis']);
+            // Crecimiento temporal
             Route::get('metricas/usuarios',        [MetricasController::class, 'usuarios']);
+            // Demográficos (con filtros)
             Route::get('metricas/demograficos',    [MetricasController::class, 'demograficos']);
+            // Palabras clave (con filtros, cuadrante dinámico)
             Route::get('metricas/palabras-clave',  [MetricasController::class, 'palabrasClave']);
+            // Matriz IGO agregada (con filtros)
             Route::get('metricas/matriz-agregada', [MetricasController::class, 'matrizAgregada']);
+            // Tabla paginada de iniciativas — nuevo
+            Route::get('metricas/iniciativas',     [MetricasController::class, 'iniciativas']);
+            // Exportar CSV / Excel (con filtros)
             Route::get('exportar',                 [MetricasController::class, 'exportar']);
         });
 });
