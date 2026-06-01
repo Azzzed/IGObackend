@@ -16,6 +16,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->validateCsrfTokens(except: [
             'api/*',
         ]);
+        $middleware->alias([
+            'cron.secret' => \App\Http\Middleware\VerifyCronSecret::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // Todas las rutas bajo api/* siempre devuelven JSON — nunca HTML

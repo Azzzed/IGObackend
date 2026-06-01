@@ -13,6 +13,7 @@ nixPkgs = [
   "php83Extensions.curl",
   "php83Extensions.zip",
   "php83Extensions.gd",
+  "php83Extensions.gmp",
   "composer"
 ]
 

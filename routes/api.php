@@ -5,6 +5,8 @@ use App\Http\Controllers\Api\V1\EmpresaController;
 use App\Http\Controllers\Api\V1\IniciativaController;
 use App\Http\Controllers\Api\V1\InformeController;
 use App\Http\Controllers\Api\V1\PlanAccionController;
+use App\Http\Controllers\Api\V1\PushController;
+use App\Http\Controllers\Api\V1\CronController;
 use App\Http\Controllers\Api\V1\Admin\MetricasController;
 use App\Http\Controllers\Api\V1\Admin\RegistrosController;
 use Illuminate\Support\Facades\Route;
@@ -17,6 +19,15 @@ Route::prefix('v1')->group(function () {
         Route::post('login',           [AuthController::class, 'login']);
         Route::post('invitado',        [AuthController::class, 'invitado']);
         Route::post('invitado/migrar', [AuthController::class, 'migrarInvitado']);
+    });
+
+    // Clave pública VAPID — segura de exponer, el frontend la necesita para suscribir
+    Route::get('push/vapid-public-key', [PushController::class, 'vapidPublicKey']);
+
+    // ─── Cron protegido por X-Cron-Secret (sin auth:sanctum) ──────────────────
+    Route::middleware('cron.secret')->prefix('cron')->group(function () {
+        Route::post('recordatorios-diarios', [CronController::class, 'recordatoriosDiarios']);
+        Route::post('resumen-semanal',       [CronController::class, 'resumenSemanal']);
     });
 
     // ─── Rutas autenticadas ───────────────────────────────────────────────────
@@ -50,6 +61,10 @@ Route::prefix('v1')->group(function () {
         Route::get('iniciativas/{iniciativa}/plan',    [PlanAccionController::class, 'show']);
         Route::put('planes/{plan}',                    [PlanAccionController::class, 'update']);
         Route::delete('planes/{plan}',                 [PlanAccionController::class, 'destroy']);
+
+        // Notificaciones push — gestión de suscripciones del dispositivo
+        Route::post('push/suscribir',    [PushController::class, 'suscribir']);
+        Route::delete('push/desuscribir', [PushController::class, 'desuscribir']);
     });
 
     // ─── Rutas de admin ───────────────────────────────────────────────────────

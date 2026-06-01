@@ -40,4 +40,14 @@ return [
         'model' => env('GROQ_MODEL', 'llama3-8b-8192'),
     ],
 
+    'webpush' => [
+        'public_key'  => env('VAPID_PUBLIC_KEY'),
+        'private_key' => env('VAPID_PRIVATE_KEY'),
+        'subject'     => env('VAPID_SUBJECT', 'mailto:admin@igomanager.com'),
+    ],
+
+    'cron' => [
+        'secret' => env('CRON_SECRET'),
+    ],
+
 ];
