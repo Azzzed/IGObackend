@@ -65,6 +65,7 @@ Route::prefix('v1')->group(function () {
         // Notificaciones push — gestión de suscripciones del dispositivo
         Route::post('push/suscribir',    [PushController::class, 'suscribir']);
         Route::delete('push/desuscribir', [PushController::class, 'desuscribir']);
+        Route::post('push/probar',        [PushController::class, 'probar']);
     });
 
     // ─── Rutas de admin ───────────────────────────────────────────────────────

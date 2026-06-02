@@ -5,11 +5,15 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Push\SuscribirRequest;
 use App\Models\PushSubscription;
+use App\Services\PushService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Throwable;
 
 class PushController extends Controller
 {
+    public function __construct(private readonly PushService $pushService) {}
+
     /**
      * GET /api/v1/push/vapid-public-key
      *
@@ -71,6 +75,42 @@ class PushController extends Controller
             'success' => true,
             'data'    => [],
             'message' => 'Suscripción eliminada correctamente.',
+        ]);
+    }
+
+    /**
+     * POST /api/v1/push/probar
+     *
+     * Envía una notificación de prueba SOLO al usuario autenticado (no masivo).
+     * Usa exclusivamente las suscripciones del propio usuario del Bearer token.
+     */
+    public function probar(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        // Sin suscripciones activas: mensaje claro, no es un error del servidor
+        if ($user->pushSubscriptions()->count() === 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No tienes notificaciones activadas',
+                'errors'  => [],
+            ], 422);
+        }
+
+        try {
+            $enviadas = $this->pushService->enviarPrueba($user);
+        } catch (Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No se pudo enviar la notificación de prueba.',
+                'errors'  => [],
+            ], 500);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data'    => ['enviadas' => $enviadas],
+            'message' => 'Notificación de prueba enviada.',
         ]);
     }
 }

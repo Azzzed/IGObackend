@@ -31,13 +31,15 @@ class PushService
      *
      * Las suscripciones expiradas (HTTP 404/410) se eliminan automáticamente.
      * Loggea el conteo de envíos exitosos sin exponer datos sensibles.
+     *
+     * @return int número de dispositivos a los que se envió con éxito
      */
-    public function enviarAUsuario(User $user, array $payload): void
+    public function enviarAUsuario(User $user, array $payload): int
     {
         $subscriptions = $user->pushSubscriptions()->get();
 
         if ($subscriptions->isEmpty()) {
-            return;
+            return 0;
         }
 
         $jsonPayload = json_encode([
@@ -95,7 +97,7 @@ class PushService
                 'user_id' => $user->id,
                 'error'   => $e->getMessage(),
             ]);
-            return;
+            return $enviadas;
         }
 
         Log::info('Push enviado', [
@@ -103,17 +105,22 @@ class PushService
             'enviadas'  => $enviadas,
             'expiradas' => $expiradas,
         ]);
+
+        return $enviadas;
     }
 
     /**
      * Envía una notificación de prueba al usuario. Útil para testing manual.
+     *
+     * @return int número de dispositivos a los que se envió con éxito
      */
-    public function enviarPrueba(User $user): void
+    public function enviarPrueba(User $user): int
     {
-        $this->enviarAUsuario($user, [
-            'title' => 'IGO Manager funciona ✓',
-            'body'  => 'Las notificaciones están activas en este dispositivo.',
-            'url'   => '/',
+        return $this->enviarAUsuario($user, [
+            'title' => 'IGO Manager ✓',
+            'body'  => 'Tus notificaciones funcionan correctamente. Te avisaremos cada mañana lo que toca hacer en tu plan.',
+            'url'   => '/matriz',
+            'icon'  => '/icons/icon-192.png',
         ]);
     }
 
