@@ -11,11 +11,17 @@ use Throwable;
 
 class PushService
 {
-    private WebPush $webPush;
+    private ?WebPush $webPush = null;
 
-    public function __construct()
+    /**
+     * Inicialización perezosa de WebPush: solo se construye cuando se va a
+     * enviar (no al instanciar el servicio). Así inyectar PushService nunca
+     * tumba una request por sí mismo; el fallo, si lo hay, ocurre dentro del
+     * try/catch del envío y devuelve un mensaje legible.
+     */
+    private function getWebPush(): WebPush
     {
-        try {
+        if ($this->webPush === null) {
             $this->webPush = new WebPush([
                 'VAPID' => [
                     'subject'    => config('services.webpush.subject'),
@@ -23,10 +29,9 @@ class PushService
                     'privateKey' => config('services.webpush.private_key'),
                 ],
             ]);
-        } catch (Throwable $e) {
-            Log::error('WebPush init failed: ' . $e->getMessage());
-            throw $e;
         }
+
+        return $this->webPush;
     }
 
     /**
@@ -54,10 +59,12 @@ class PushService
             'icon'  => $payload['icon'] ?? '/icon-192.png',
         ]);
 
+        $webPush = $this->getWebPush();
+
         // Encola todas las notificaciones del usuario
         foreach ($subscriptions as $sub) {
             try {
-                $this->webPush->queueNotification(
+                $webPush->queueNotification(
                     $this->construirSubscription($sub),
                     $jsonPayload
                 );
@@ -75,7 +82,7 @@ class PushService
         $expiradas = 0;
 
         try {
-            foreach ($this->webPush->flush() as $report) {
+            foreach ($webPush->flush() as $report) {
                 $endpoint = $report->getRequest()->getUri()->__toString();
 
                 if ($report->isSuccess()) {

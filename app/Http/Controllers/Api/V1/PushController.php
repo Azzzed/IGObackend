@@ -9,6 +9,7 @@ use App\Services\NotificacionService;
 use App\Services\PushService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Throwable;
 
 class PushController extends Controller
@@ -139,9 +140,12 @@ class PushController extends Controller
                 'message' => 'Notificación de prueba enviada.',
             ]);
         } catch (Throwable $e) {
+            Log::error('Push probar error: ' . $e->getMessage() .
+                ' in ' . $e->getFile() . ':' . $e->getLine());
+
             return response()->json([
                 'success' => false,
-                'message' => 'No se pudo enviar la notificación de prueba.',
+                'message' => 'Error al enviar notificación: ' . $e->getMessage(),
                 'errors'  => [],
             ], 500);
         }
