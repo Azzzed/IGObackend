@@ -142,6 +142,86 @@ class NotificacionService
     }
 
     /* ─────────────────────────────────────────────
+     |  Próxima acción del plan (para la notificación de prueba)
+     ───────────────────────────────────────────── */
+
+    /**
+     * Devuelve un payload push con la PRÓXIMA acción/iniciativa del plan del
+     * usuario: la de fecha más cercana de hoy en adelante (America/Bogota).
+     *
+     * @return array|null payload listo para push, o null si no hay plan futuro
+     */
+    public function proximaNotificacion(User $user): ?array
+    {
+        $hoy        = Carbon::now(self::TZ)->startOfDay();
+        $candidatos = [];
+
+        foreach ($this->iniciativasConPlazoDelUsuario($user) as $ini) {
+            $plazo    = $ini['plazo'];
+            $acciones = is_array($ini['acciones'] ?? null) ? $ini['acciones'] : [];
+
+            if (count($acciones) === 0) {
+                continue;
+            }
+
+            $fechas = $this->distribuirAcciones(
+                $plazo['fecha_inicio'],
+                $plazo['fecha_fin'],
+                count($acciones)
+            );
+
+            foreach ($fechas as $idx => $fechaStr) {
+                $fecha = Carbon::parse($fechaStr, self::TZ)->startOfDay();
+
+                // Solo acciones de hoy en adelante
+                if ($fecha->lt($hoy)) {
+                    continue;
+                }
+
+                $candidatos[] = [
+                    'dias'              => (int) $hoy->diffInDays($fecha),
+                    'iniciativa_titulo' => $ini['titulo'] ?? 'Iniciativa',
+                    'accion_titulo'     => $acciones[$idx]['titulo'] ?? 'Acción programada',
+                    'cuadrante'         => (int) ($ini['cuadrante'] ?? 99),
+                    'importancia'       => (int) ($ini['importancia'] ?? 0),
+                ];
+            }
+        }
+
+        if (count($candidatos) === 0) {
+            return null;
+        }
+
+        // Más cercana primero; empate → cuadrante menor, luego mayor importancia
+        usort($candidatos, function ($a, $b) {
+            return $a['dias'] <=> $b['dias']
+                ?: $a['cuadrante'] <=> $b['cuadrante']
+                ?: $b['importancia'] <=> $a['importancia'];
+        });
+
+        $prox = $candidatos[0];
+
+        return [
+            'title' => 'Próximo en tu plan: ' . $prox['iniciativa_titulo'],
+            'body'  => $this->fechaRelativa($prox['dias']) . ' — ' . $prox['accion_titulo'],
+            'url'   => '/matriz',
+            'icon'  => '/icons/icon-192.png',
+        ];
+    }
+
+    /**
+     * Convierte un número de días en una etiqueta relativa legible.
+     */
+    private function fechaRelativa(int $dias): string
+    {
+        return match (true) {
+            $dias <= 0  => 'Hoy',
+            $dias === 1 => 'Mañana',
+            default     => "En {$dias} días",
+        };
+    }
+
+    /* ─────────────────────────────────────────────
      |  Helpers
      ───────────────────────────────────────────── */
 

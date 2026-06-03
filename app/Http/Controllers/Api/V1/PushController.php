@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Push\SuscribirRequest;
 use App\Models\PushSubscription;
+use App\Services\NotificacionService;
 use App\Services\PushService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -12,7 +13,10 @@ use Throwable;
 
 class PushController extends Controller
 {
-    public function __construct(private readonly PushService $pushService) {}
+    public function __construct(
+        private readonly PushService $pushService,
+        private readonly NotificacionService $notificacionService,
+    ) {}
 
     /**
      * GET /api/v1/push/vapid-public-key
@@ -81,7 +85,9 @@ class PushController extends Controller
     /**
      * POST /api/v1/push/probar
      *
-     * Envía una notificación de prueba SOLO al usuario autenticado (no masivo).
+     * Envía una notificación SOLO al usuario autenticado (no masivo) con la
+     * próxima acción de su plan. Si no tiene plan futuro, cae al fallback de
+     * notificación genérica para que el botón siempre haga algo útil.
      * Usa exclusivamente las suscripciones del propio usuario del Bearer token.
      */
     public function probar(Request $request): JsonResponse
@@ -98,7 +104,27 @@ class PushController extends Controller
         }
 
         try {
+            $payload = $this->notificacionService->proximaNotificacion($user);
+
+            if ($payload !== null) {
+                // Hay plan futuro: notificación con contenido real
+                $enviadas = $this->pushService->enviarAUsuario($user, $payload);
+
+                return response()->json([
+                    'success' => true,
+                    'data'    => ['enviadas' => $enviadas, 'preview' => $payload],
+                    'message' => 'Notificación enviada con tu próxima acción del plan.',
+                ]);
+            }
+
+            // Fallback: notificación genérica
             $enviadas = $this->pushService->enviarPrueba($user);
+
+            return response()->json([
+                'success' => true,
+                'data'    => ['enviadas' => $enviadas, 'preview' => null],
+                'message' => 'Notificación de prueba enviada.',
+            ]);
         } catch (Throwable $e) {
             return response()->json([
                 'success' => false,
@@ -106,11 +132,5 @@ class PushController extends Controller
                 'errors'  => [],
             ], 500);
         }
-
-        return response()->json([
-            'success' => true,
-            'data'    => ['enviadas' => $enviadas],
-            'message' => 'Notificación de prueba enviada.',
-        ]);
     }
 }
