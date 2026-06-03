@@ -15,13 +15,18 @@ class PushService
 
     public function __construct()
     {
-        $this->webPush = new WebPush([
-            'VAPID' => [
-                'subject'    => config('services.webpush.subject'),
-                'publicKey'  => config('services.webpush.public_key'),
-                'privateKey' => config('services.webpush.private_key'),
-            ],
-        ]);
+        try {
+            $this->webPush = new WebPush([
+                'VAPID' => [
+                    'subject'    => config('services.webpush.subject'),
+                    'publicKey'  => config('services.webpush.public_key'),
+                    'privateKey' => config('services.webpush.private_key'),
+                ],
+            ]);
+        } catch (Throwable $e) {
+            Log::error('WebPush init failed: ' . $e->getMessage());
+            throw $e;
+        }
     }
 
     /**

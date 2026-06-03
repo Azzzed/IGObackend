@@ -13,22 +13,32 @@ use Throwable;
 
 class PushController extends Controller
 {
-    public function __construct(
-        private readonly PushService $pushService,
-        private readonly NotificacionService $notificacionService,
-    ) {}
+    // Sin constructor: los servicios se inyectan por método SOLO donde se usan.
+    // Así una falla al instanciar PushService (WebPush) nunca tumba rutas que
+    // no lo necesitan, como vapid-public-key.
 
     /**
      * GET /api/v1/push/vapid-public-key
      *
      * Devuelve la clave pública VAPID para que el frontend suscriba el navegador.
      * No expone ningún dato sensible (la clave pública es segura de compartir).
+     * No depende de PushService ni de WebPush.
      */
     public function vapidPublicKey(): JsonResponse
     {
+        $key = config('services.webpush.public_key');
+
+        if (empty($key)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'VAPID_PUBLIC_KEY no configurada',
+                'errors'  => [],
+            ], 500);
+        }
+
         return response()->json([
             'success' => true,
-            'data'    => ['public_key' => config('services.webpush.public_key')],
+            'data'    => ['public_key' => $key],
             'message' => 'Clave pública VAPID obtenida correctamente.',
         ]);
     }
@@ -90,8 +100,11 @@ class PushController extends Controller
      * notificación genérica para que el botón siempre haga algo útil.
      * Usa exclusivamente las suscripciones del propio usuario del Bearer token.
      */
-    public function probar(Request $request): JsonResponse
-    {
+    public function probar(
+        Request $request,
+        PushService $pushService,
+        NotificacionService $notificacionService,
+    ): JsonResponse {
         $user = $request->user();
 
         // Sin suscripciones activas: mensaje claro, no es un error del servidor
@@ -104,11 +117,11 @@ class PushController extends Controller
         }
 
         try {
-            $payload = $this->notificacionService->proximaNotificacion($user);
+            $payload = $notificacionService->proximaNotificacion($user);
 
             if ($payload !== null) {
                 // Hay plan futuro: notificación con contenido real
-                $enviadas = $this->pushService->enviarAUsuario($user, $payload);
+                $enviadas = $pushService->enviarAUsuario($user, $payload);
 
                 return response()->json([
                     'success' => true,
@@ -118,7 +131,7 @@ class PushController extends Controller
             }
 
             // Fallback: notificación genérica
-            $enviadas = $this->pushService->enviarPrueba($user);
+            $enviadas = $pushService->enviarPrueba($user);
 
             return response()->json([
                 'success' => true,
