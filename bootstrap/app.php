@@ -17,7 +17,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'api/*',
         ]);
         $middleware->alias([
-            'cron.secret' => \App\Http\Middleware\VerifyCronSecret::class,
+            'cron.secret'   => \App\Http\Middleware\VerifyCronSecret::class,
+            'token.refresh' => \App\Http\Middleware\RefreshToken::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

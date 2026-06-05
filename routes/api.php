@@ -31,7 +31,9 @@ Route::prefix('v1')->group(function () {
     });
 
     // ─── Rutas autenticadas ───────────────────────────────────────────────────
-    Route::middleware('auth:sanctum')->group(function () {
+    // token.refresh emite un token nuevo en X-Refreshed-Token cuando el actual
+    // está por expirar, manteniendo viva la sesión de usuarios activos.
+    Route::middleware(['auth:sanctum', 'token.refresh'])->group(function () {
 
         // Auth
         Route::prefix('auth')->group(function () {
@@ -69,7 +71,7 @@ Route::prefix('v1')->group(function () {
     });
 
     // ─── Rutas de admin ───────────────────────────────────────────────────────
-    Route::middleware(['auth:sanctum', \App\Http\Middleware\AdminMiddleware::class])
+    Route::middleware(['auth:sanctum', 'token.refresh', \App\Http\Middleware\AdminMiddleware::class])
         ->prefix('admin')
         ->group(function () {
             // KPIs — nuevo

@@ -47,7 +47,11 @@ return [
     |
     */
 
-    'expiration' => null,
+    // 30 días (60 min * 24 h * 30 días = 43200 min). Antes era null (sin
+    // expiración). Con el middleware RefreshToken, los usuarios activos
+    // reciben un token nuevo cuando faltan menos de 7 días, así la sesión
+    // nunca caduca mientras se use la app.
+    'expiration' => 60 * 24 * 30,
 
     /*
     |--------------------------------------------------------------------------

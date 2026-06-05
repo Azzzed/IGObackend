@@ -16,7 +16,9 @@ return [
 
     'allowed_headers' => ['*'],
 
-    'exposed_headers' => [],
+    // El frontend lee este header para reemplazar el token renovado de forma
+    // transparente. Sin exponerlo, el navegador no permite leerlo desde JS.
+    'exposed_headers' => ['X-Refreshed-Token'],
 
     'max_age' => 0,
 
