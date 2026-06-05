@@ -7,12 +7,14 @@ use App\Http\Requests\Auth\InvitadoRequest;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Requests\Auth\MigrarInvitadoRequest;
 use App\Http\Requests\Auth\RegistroRequest;
+use App\Http\Requests\Auth\UpgradeCuentaRequest;
 use App\Http\Resources\UserResource;
 use App\Models\Empresa;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -119,28 +121,83 @@ class AuthController extends Controller
         ], 201);
     }
 
+    /**
+     * Convierte la cuenta invitado AUTENTICADA en una cuenta registrada
+     * SIN crear un usuario nuevo: actualiza la misma fila. Como las empresas
+     * e iniciativas ya pertenecen a este user_id, no hay nada que transferir
+     * y es imposible huérfanar datos.
+     *
+     * Esta es la vía recomendada para "enlazar un perfil a la cuenta
+     * exploratoria": el frontend llama con el Bearer token del invitado.
+     */
+    public function upgrade(UpgradeCuentaRequest $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if ($user->tipo === 'registrado') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Esta cuenta ya está registrada.',
+                'errors'  => [],
+            ], 409);
+        }
+
+        DB::transaction(function () use ($user, $request) {
+            $user->update([
+                'tipo'                 => 'registrado',
+                'nombre'               => $request->nombre,
+                'email'                => $request->email,
+                'password'             => Hash::make($request->password),
+                'token_invitado'       => null,
+                'consentimiento'       => true,
+                'fecha_consentimiento' => now(),
+                'version_politica'     => '1.0',
+            ]);
+        });
+
+        Cache::forget('me:' . $user->id);
+
+        // Token nuevo para la cuenta ya registrada (la sesión sigue siendo la misma fila).
+        $token = $user->createToken('auth_token')->plainTextToken;
+
+        return response()->json([
+            'success' => true,
+            'data'    => [
+                'token' => $token,
+                'user'  => new UserResource($user->fresh()),
+            ],
+            'message' => 'Perfil enlazado. Tu cuenta exploratoria ahora es una cuenta registrada con todos tus datos.',
+        ]);
+    }
+
     public function migrarInvitado(MigrarInvitadoRequest $request): JsonResponse
     {
         $invitado = User::where('token_invitado', $request->token_invitado)
             ->where('tipo', 'invitado')
             ->firstOrFail();
 
-        $registrado = User::create([
-            'tipo'                 => 'registrado',
-            'nombre'               => $request->nombre,
-            'email'                => $request->email,
-            'password'             => Hash::make($request->password),
-            'consentimiento'       => true,
-            'fecha_consentimiento' => now(),
-            'version_politica'     => '1.0',
-        ]);
+        // Todo o nada: si algo falla, no quedan empresas huérfanas ni cuentas a medias.
+        $registrado = DB::transaction(function () use ($invitado, $request) {
+            $registrado = User::create([
+                'tipo'                 => 'registrado',
+                'nombre'               => $request->nombre,
+                'email'                => $request->email,
+                'password'             => Hash::make($request->password),
+                'consentimiento'       => true,
+                'fecha_consentimiento' => now(),
+                'version_politica'     => '1.0',
+            ]);
 
-        // Transferir todas las empresas del invitado al nuevo usuario registrado
-        Empresa::where('user_id', $invitado->id)->update(['user_id' => $registrado->id]);
+            // Transferir todas las empresas del invitado al nuevo usuario registrado.
+            // Las iniciativas y planes siguen a la empresa por su FK, no hace falta tocarlas.
+            Empresa::where('user_id', $invitado->id)->update(['user_id' => $registrado->id]);
 
-        // Revocar tokens del invitado y eliminarlo
-        $invitado->tokens()->delete();
-        $invitado->delete();
+            // Revocar tokens del invitado y soft-deletear la cuenta invitado.
+            $invitado->tokens()->delete();
+            $invitado->delete();
+
+            return $registrado;
+        });
 
         // Limpiar caché del invitado
         Cache::forget('me:' . $invitado->id);

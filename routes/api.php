@@ -39,6 +39,8 @@ Route::prefix('v1')->group(function () {
         Route::prefix('auth')->group(function () {
             Route::post('logout', [AuthController::class, 'logout']);
             Route::get('me',      [AuthController::class, 'me']);
+            // Enlazar perfil a la cuenta exploratoria (upgrade in-place del invitado)
+            Route::post('upgrade', [AuthController::class, 'upgrade']);
         });
 
         // Empresas
