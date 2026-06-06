@@ -17,6 +17,11 @@ class UserResource extends JsonResource
             'consentimiento'       => $this->consentimiento,
             'fecha_consentimiento' => $this->fecha_consentimiento?->toIso8601String(),
             'created_at'           => $this->created_at->toIso8601String(),
+            // Solo para invitados: se devuelve su propio token_invitado para que
+            // el frontend pueda enlazar la cuenta (migrar) incluso tras recargar,
+            // cuando ya no lo tiene en memoria. Es el identificador de su propia
+            // sesión, no expone datos de terceros.
+            'token_invitado'       => $this->when($this->tipo === 'invitado', $this->token_invitado),
         ];
     }
 }

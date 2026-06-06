@@ -24,13 +24,13 @@ class AuthController extends Controller
 {
     public function registro(RegistroRequest $request): JsonResponse
     {
-        // Si la petición trae el Bearer token de una cuenta exploratoria activa
-        // (el interceptor del frontend lo adjunta a todas las llamadas), NO se
-        // crea una cuenta nueva huérfana: se crea la registrada, se reasignan
-        // TODAS las empresas del invitado al nuevo user_id y se elimina la
-        // cuenta exploratoria. Así nunca quedan empresas huérfanas, sin importar
-        // qué endpoint use el frontend.
-        $invitado = $this->invitadoDesdeBearer($request);
+        // Si la petición identifica una cuenta exploratoria activa (por
+        // token_invitado en el body, o por el Bearer del invitado que adjunta
+        // el interceptor), NO se crea una cuenta nueva huérfana: se crea la
+        // registrada, se reasignan TODAS las empresas del invitado al nuevo
+        // user_id y se elimina la cuenta exploratoria. Así nunca quedan
+        // empresas huérfanas, sin importar qué endpoint use el frontend.
+        $invitado = $this->invitadoDesdeRequest($request);
 
         $user = DB::transaction(function () use ($request, $invitado) {
             $registrado = User::create([
@@ -77,25 +77,37 @@ class AuthController extends Controller
     }
 
     /**
-     * Devuelve la cuenta invitado dueña del Bearer token de la petición, si lo
-     * hay y es de tipo invitado. Permite migrar de forma transparente aunque la
-     * ruta sea pública: el interceptor del frontend adjunta el token del invitado.
+     * Resuelve la cuenta invitado asociada a la petición de registro, por dos
+     * vías (la primera que funcione):
+     *   1) token_invitado en el body  — el frontend lo tiene de forma persistente
+     *      y ahora también lo puede releer desde /auth/me tras recargar.
+     *   2) Bearer token del invitado  — lo adjunta el interceptor de axios.
+     * Devuelve null si no hay ninguna sesión invitada identificable.
      */
-    private function invitadoDesdeBearer(Request $request): ?User
+    private function invitadoDesdeRequest(Request $request): ?User
     {
+        // 1) token_invitado explícito en el body (vía más fiable)
+        $tokenInvitado = $request->input('token_invitado');
+        if (is_string($tokenInvitado) && $tokenInvitado !== '') {
+            $owner = User::where('token_invitado', $tokenInvitado)
+                ->where('tipo', 'invitado')
+                ->first();
+            if ($owner) {
+                return $owner;
+            }
+        }
+
+        // 2) Bearer token del invitado
         $bearer = $request->bearerToken();
-        if (! $bearer) {
-            return null;
+        if ($bearer) {
+            $accessToken = PersonalAccessToken::findToken($bearer);
+            $owner       = $accessToken?->tokenable;
+            if ($owner instanceof User && $owner->tipo === 'invitado') {
+                return $owner;
+            }
         }
 
-        $accessToken = PersonalAccessToken::findToken($bearer);
-        if (! $accessToken) {
-            return null;
-        }
-
-        $owner = $accessToken->tokenable;
-
-        return ($owner instanceof User && $owner->tipo === 'invitado') ? $owner : null;
+        return null;
     }
 
     public function login(LoginRequest $request): JsonResponse
