@@ -16,7 +16,10 @@ class RegistroRequest extends FormRequest
         return [
             'nombre'                => ['required', 'string', 'max:255'],
             'email'                 => ['required', 'email', 'max:255', 'unique:users,email'],
-            'password'              => ['required', 'string', 'min:8', 'confirmed'],
+            // El frontend valida la coincidencia de contraseñas en la UI; el
+            // backend solo exige la contraseña (sin 'confirmed') para no acoplar
+            // al nombre del campo de confirmación y evitar 422 espurios.
+            'password'              => ['required', 'string', 'min:8'],
             'consentimiento'        => ['required', 'accepted'],
         ];
     }

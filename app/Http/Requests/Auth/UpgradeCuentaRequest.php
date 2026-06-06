@@ -16,7 +16,8 @@ class UpgradeCuentaRequest extends FormRequest
         return [
             'nombre'         => ['required', 'string', 'max:255'],
             'email'          => ['required', 'email', 'max:255', 'unique:users,email'],
-            'password'       => ['required', 'string', 'min:8', 'confirmed'],
+            // Sin 'confirmed': el frontend valida la coincidencia en la UI.
+            'password'       => ['required', 'string', 'min:8'],
             'consentimiento' => ['required', 'accepted'],
         ];
     }

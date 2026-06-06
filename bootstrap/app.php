@@ -25,6 +25,16 @@ return Application::configure(basePath: dirname(__DIR__))
         // Todas las rutas bajo api/* siempre devuelven JSON — nunca HTML
         $exceptions->render(function (\Illuminate\Validation\ValidationException $e, $request) {
             if ($request->is('api/*')) {
+                // Diagnóstico seguro: registramos SOLO los nombres de los campos
+                // que fallaron (nunca valores ni email) en rutas de autenticación,
+                // para poder depurar 422 sin exponer datos sensibles.
+                if ($request->is('api/v1/auth/*')) {
+                    \Illuminate\Support\Facades\Log::warning('Validación 422 en auth', [
+                        'ruta'    => $request->path(),
+                        'campos'  => array_keys($e->errors()),
+                    ]);
+                }
+
                 return response()->json([
                     'success' => false,
                     'message' => 'Los datos enviados no son válidos.',
