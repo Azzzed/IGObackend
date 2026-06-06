@@ -18,20 +18,49 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Laravel\Sanctum\PersonalAccessToken;
 
 class AuthController extends Controller
 {
     public function registro(RegistroRequest $request): JsonResponse
     {
-        $user = User::create([
-            'tipo'                 => 'registrado',
-            'nombre'               => $request->nombre,
-            'email'                => $request->email,
-            'password'             => Hash::make($request->password),
-            'consentimiento'       => true,
-            'fecha_consentimiento' => now(),
-            'version_politica'     => '1.0',
-        ]);
+        // Si la petición trae el Bearer token de una cuenta exploratoria activa
+        // (el interceptor del frontend lo adjunta a todas las llamadas), NO se
+        // crea una cuenta nueva huérfana: se crea la registrada, se reasignan
+        // TODAS las empresas del invitado al nuevo user_id y se elimina la
+        // cuenta exploratoria. Así nunca quedan empresas huérfanas, sin importar
+        // qué endpoint use el frontend.
+        $invitado = $this->invitadoDesdeBearer($request);
+
+        $user = DB::transaction(function () use ($request, $invitado) {
+            $registrado = User::create([
+                'tipo'                 => 'registrado',
+                'nombre'               => $request->nombre,
+                'email'                => $request->email,
+                'password'             => Hash::make($request->password),
+                'consentimiento'       => true,
+                'fecha_consentimiento' => now(),
+                'version_politica'     => '1.0',
+            ]);
+
+            if ($invitado) {
+                // Tomar las empresas de la cuenta exploratoria y reapuntar su
+                // user_id al de la nueva cuenta registrada. Las iniciativas y
+                // planes siguen a la empresa por su FK (no hay que tocarlas).
+                Empresa::where('user_id', $invitado->id)
+                    ->update(['user_id' => $registrado->id]);
+
+                // Revocar tokens y eliminar la cuenta exploratoria del registro.
+                $invitado->tokens()->delete();
+                $invitado->delete();
+            }
+
+            return $registrado;
+        });
+
+        if ($invitado) {
+            Cache::forget('me:' . $invitado->id);
+        }
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
@@ -41,8 +70,32 @@ class AuthController extends Controller
                 'token' => $token,
                 'user'  => new UserResource($user),
             ],
-            'message' => 'Cuenta creada exitosamente.',
+            'message' => $invitado
+                ? 'Cuenta creada. Tus empresas de la sesión exploratoria fueron transferidas.'
+                : 'Cuenta creada exitosamente.',
         ], 201);
+    }
+
+    /**
+     * Devuelve la cuenta invitado dueña del Bearer token de la petición, si lo
+     * hay y es de tipo invitado. Permite migrar de forma transparente aunque la
+     * ruta sea pública: el interceptor del frontend adjunta el token del invitado.
+     */
+    private function invitadoDesdeBearer(Request $request): ?User
+    {
+        $bearer = $request->bearerToken();
+        if (! $bearer) {
+            return null;
+        }
+
+        $accessToken = PersonalAccessToken::findToken($bearer);
+        if (! $accessToken) {
+            return null;
+        }
+
+        $owner = $accessToken->tokenable;
+
+        return ($owner instanceof User && $owner->tipo === 'invitado') ? $owner : null;
     }
 
     public function login(LoginRequest $request): JsonResponse
