@@ -197,7 +197,8 @@ class AuthController extends Controller
      */
     public function upgrade(UpgradeCuentaRequest $request): JsonResponse
     {
-        $user = $request->user();
+        $user      = $request->user();
+        $tipoAntes = $user->tipo;
 
         if ($user->tipo === 'registrado') {
             return response()->json([
@@ -207,29 +208,48 @@ class AuthController extends Controller
             ], 409);
         }
 
-        DB::transaction(function () use ($user, $request) {
-            $user->update([
-                'tipo'                 => 'registrado',
-                'nombre'               => $request->nombre,
-                'email'                => $request->email,
-                'password'             => Hash::make($request->password),
-                'token_invitado'       => null,
-                'consentimiento'       => true,
-                'fecha_consentimiento' => now(),
-                'version_politica'     => '1.0',
-            ]);
-        });
+        // UPDATE directo a nivel de BD (query builder): garantiza que la
+        // escritura se ejecute sin depender de dirty-checking de Eloquent ni
+        // de eventos de modelo. Devuelve el número de filas afectadas.
+        $filas = DB::table('users')->where('id', $user->id)->update([
+            'tipo'                 => 'registrado',
+            'nombre'               => $request->nombre,
+            'email'                => $request->email,
+            'password'             => Hash::make($request->password),
+            'token_invitado'       => null,
+            'consentimiento'       => true,
+            'fecha_consentimiento' => now(),
+            'version_politica'     => '1.0',
+            'updated_at'           => now(),
+        ]);
 
         Cache::forget('me:' . $user->id);
 
-        // Token nuevo para la cuenta ya registrada (la sesión sigue siendo la misma fila).
-        $token = $user->createToken('auth_token')->plainTextToken;
+        // Releer desde BD para confirmar el estado real persistido.
+        $fresh = User::find($user->id);
+
+        // Diagnóstico (tabla leíble): registra qué pasó realmente.
+        try {
+            DB::table('debug_auth_eventos')->insert([
+                'ruta'         => 'upgrade',
+                'bearer'       => (bool) $request->bearerToken(),
+                'user_id'      => $user->id,
+                'tipo_antes'   => $tipoAntes,
+                'tipo_despues' => $fresh?->tipo,
+                'filas'        => $filas,
+                'created_at'   => now(),
+            ]);
+        } catch (\Throwable $e) {
+            // no romper el flujo por el log de diagnóstico
+        }
+
+        $token = $fresh->createToken('auth_token')->plainTextToken;
 
         return response()->json([
             'success' => true,
             'data'    => [
                 'token' => $token,
-                'user'  => new UserResource($user->fresh()),
+                'user'  => new UserResource($fresh),
             ],
             'message' => 'Perfil enlazado. Tu cuenta exploratoria ahora es una cuenta registrada con todos tus datos.',
         ]);
